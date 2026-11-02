@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: saviynt-local-sandbox
+  server:
+  port: 8080
+
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/saviynt_eic_local?createDatabaseIfNotExist=true&allowMultiQueries=true
+    username: root
+    password: Password@123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      continue-on-error: false
+
