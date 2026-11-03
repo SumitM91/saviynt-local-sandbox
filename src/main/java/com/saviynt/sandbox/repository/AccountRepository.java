@@ -1,22 +1,23 @@
 package com.saviynt.sandbox.repository;
 
-import com.saviynt.sandbox.dto.OrphanAccountResponse;
-import com.saviynt.sandbox.dto.TerminatedViolationResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.saviynt.sandbox.entity.AccountEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
+/**
+ * Spring Data JPA Repository for Target Account entities (accounts).
+ */
 @Repository
-public class AccountRepository {
+public interface AccountRepository extends JpaRepository<AccountEntity, Long> {
 
-    private final JdbcTemplate jdbcTemplate;
-
-    public AccountRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    public record LinkedAccountEntity(
+    record LinkedAccountEntity(
             long accountkey,
             String accountname,
             Long endpointkey,
@@ -24,89 +25,35 @@ public class AccountRepository {
             int status
     ) {}
 
-    public List<OrphanAccountResponse> findOrphanAccounts() {
-        String sql = """
-            SELECT 
-                e.endpointname AS Endpoint,
-                a.accountkey AS AccountKey,
-                a.name AS AccountName,
-                a.customproperty1 AS Target_EmpID,
-                a.accounttype AS AccountType
-            FROM accounts a
-            INNER JOIN endpoints e ON a.endpointkey = e.endpointkey
-            LEFT JOIN user_accounts ua ON a.accountkey = ua.accountkey
-            WHERE ua.userkey IS NULL
-            """;
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new OrphanAccountResponse(
-                rs.getString("Endpoint"),
-                rs.getLong("AccountKey"),
-                rs.getString("AccountName"),
-                rs.getString("Target_EmpID"),
-                rs.getString("AccountType")
-        ));
+    Optional<AccountEntity> findByAccountname(String accountname);
+
+    @Query(value = """
+        SELECT 
+            a.accountkey, 
+            a.name AS accountname, 
+            a.endpointkey, 
+            a.status, 
+            e.endpointname
+        FROM user_accounts ua
+        INNER JOIN accounts a ON ua.accountkey = a.accountkey
+        LEFT JOIN endpoints e ON a.endpointkey = e.endpointkey
+        WHERE ua.userkey = :userKey
+        """, nativeQuery = true)
+    List<Map<String, Object>> findAccountsByUserKeyRaw(@Param("userKey") long userKey);
+
+    default List<LinkedAccountEntity> findAccountsByUserKey(long userKey) {
+        return findAccountsByUserKeyRaw(userKey).stream()
+                .map(row -> new LinkedAccountEntity(
+                        ((Number) row.get("accountkey")).longValue(),
+                        (String) row.get("accountname"),
+                        row.get("endpointkey") != null ? ((Number) row.get("endpointkey")).longValue() : null,
+                        (String) row.get("endpointname"),
+                        ((Number) row.get("status")).intValue()
+                ))
+                .toList();
     }
 
-    public int runAccountCorrelation() {
-        String sql = """
-            INSERT IGNORE INTO user_accounts (userkey, accountkey)
-            SELECT u.userkey, a.accountkey
-            FROM accounts a
-            INNER JOIN users u ON a.customproperty1 = u.customproperty1
-            LEFT JOIN user_accounts ua ON a.accountkey = ua.accountkey
-            WHERE ua.userkey IS NULL
-            """;
-        return jdbcTemplate.update(sql);
-    }
-
-    public List<TerminatedViolationResponse> findTerminatedUsersWithActiveAccounts() {
-        String sql = """
-            SELECT 
-                u.username AS Terminated_User,
-                u.statuskey AS User_StatusKey,
-                a.name AS Active_Target_Account,
-                e.endpointname AS Endpoint,
-                a.status AS Account_Status
-            FROM users u
-            INNER JOIN user_accounts ua ON u.userkey = ua.userkey
-            INNER JOIN accounts a ON ua.accountkey = a.accountkey
-            INNER JOIN endpoints e ON a.endpointkey = e.endpointkey
-            WHERE u.statuskey = 0 AND a.status = 1
-            """;
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new TerminatedViolationResponse(
-                rs.getString("Terminated_User"),
-                rs.getInt("User_StatusKey"),
-                rs.getString("Active_Target_Account"),
-                rs.getString("Endpoint"),
-                rs.getInt("Account_Status")
-        ));
-    }
-
-    public List<LinkedAccountEntity> findAccountsByUserKey(long userKey) {
-        String sql = """
-            SELECT 
-                a.accountkey, 
-                a.name AS accountname, 
-                a.endpointkey, 
-                a.status, 
-                e.endpointname
-            FROM user_accounts ua
-            INNER JOIN accounts a ON ua.accountkey = a.accountkey
-            LEFT JOIN endpoints e ON a.endpointkey = e.endpointkey
-            WHERE ua.userkey = ?
-            """;
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new LinkedAccountEntity(
-                rs.getLong("accountkey"),
-                rs.getString("accountname"),
-                rs.getObject("endpointkey") != null ? rs.getLong("endpointkey") : null,
-                rs.getString("endpointname"),
-                rs.getInt("status")
-        ), userKey);
-    }
-
-    public int updateAccountStatus(long accountKey, int status) {
-        return jdbcTemplate.update(
-                "UPDATE accounts SET status = ? WHERE accountkey = ?",
-                status, accountKey
-        );
-    }
+    @Modifying
+    @Query("UPDATE AccountEntity a SET a.status = :status WHERE a.accountkey = :accountKey")
+    int updateAccountStatus(@Param("accountKey") long accountKey, @Param("status") int status);
 }

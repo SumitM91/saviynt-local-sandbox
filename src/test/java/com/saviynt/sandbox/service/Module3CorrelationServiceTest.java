@@ -3,7 +3,7 @@ package com.saviynt.sandbox.service;
 import com.saviynt.sandbox.dto.CorrelationJobResponse;
 import com.saviynt.sandbox.dto.OrphanAccountResponse;
 import com.saviynt.sandbox.dto.TerminatedViolationResponse;
-import com.saviynt.sandbox.repository.AccountRepository;
+import com.saviynt.sandbox.repository.CorrelationDao;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.*;
 class Module3CorrelationServiceTest {
 
     @Mock
-    private AccountRepository accountRepository;
+    private CorrelationDao correlationDao;
 
     @InjectMocks
     private Module3CorrelationService correlationService;
@@ -33,48 +33,48 @@ class Module3CorrelationServiceTest {
                 new OrphanAccountResponse("AWS_Production", 503L, "admin_backdoor_aws", null, "Service"),
                 new OrphanAccountResponse("AWS_Production", 504L, "pnair_aws_unlinked", "EMP003", "User")
         );
-        when(accountRepository.findOrphanAccounts()).thenReturn(mockOrphans);
+        when(correlationDao.findOrphanAccounts()).thenReturn(mockOrphans);
 
         List<OrphanAccountResponse> result = correlationService.getOrphanAccounts();
 
         assertThat(result).hasSize(2);
         assertThat(result.getFirst().accountName()).isEqualTo("admin_backdoor_aws");
-        verify(accountRepository, times(1)).findOrphanAccounts();
+        verify(correlationDao, times(1)).findOrphanAccounts();
     }
 
     @Test
     @DisplayName("getOrphanAccounts: Should return empty list when no orphans exist")
     void testGetOrphanAccounts_Empty() {
-        when(accountRepository.findOrphanAccounts()).thenReturn(Collections.emptyList());
+        when(correlationDao.findOrphanAccounts()).thenReturn(Collections.emptyList());
 
         List<OrphanAccountResponse> result = correlationService.getOrphanAccounts();
 
         assertThat(result).isEmpty();
-        verify(accountRepository, times(1)).findOrphanAccounts();
+        verify(correlationDao, times(1)).findOrphanAccounts();
     }
 
     @Test
     @DisplayName("runAccountCorrelationJob: Should return response with count of correlated accounts")
     void testRunAccountCorrelationJob_Success() {
-        when(accountRepository.runAccountCorrelation()).thenReturn(2);
+        when(correlationDao.runAccountCorrelation()).thenReturn(2);
 
         CorrelationJobResponse response = correlationService.runAccountCorrelationJob();
 
         assertThat(response.jobName()).isEqualTo("AccountCorrelationJob");
         assertThat(response.newlyCorrelatedAccounts()).isEqualTo(2);
         assertThat(response.message()).contains("customproperty1");
-        verify(accountRepository, times(1)).runAccountCorrelation();
+        verify(correlationDao, times(1)).runAccountCorrelation();
     }
 
     @Test
     @DisplayName("runAccountCorrelationJob: Edge case when 0 accounts are correlated")
     void testRunAccountCorrelationJob_ZeroCorrelated() {
-        when(accountRepository.runAccountCorrelation()).thenReturn(0);
+        when(correlationDao.runAccountCorrelation()).thenReturn(0);
 
         CorrelationJobResponse response = correlationService.runAccountCorrelationJob();
 
         assertThat(response.newlyCorrelatedAccounts()).isZero();
-        verify(accountRepository, times(1)).runAccountCorrelation();
+        verify(correlationDao, times(1)).runAccountCorrelation();
     }
 
     @Test
@@ -83,24 +83,24 @@ class Module3CorrelationServiceTest {
         List<TerminatedViolationResponse> mockViolations = List.of(
                 new TerminatedViolationResponse("rahul.verma", 0, "rahul.verma.aws", "AWS_Production", 1)
         );
-        when(accountRepository.findTerminatedUsersWithActiveAccounts()).thenReturn(mockViolations);
+        when(correlationDao.findTerminatedUsersWithActiveAccounts()).thenReturn(mockViolations);
 
         List<TerminatedViolationResponse> result = correlationService.getTerminatedUsersWithActiveAccounts();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().terminatedUser()).isEqualTo("rahul.verma");
         assertThat(result.getFirst().accountStatus()).isEqualTo(1);
-        verify(accountRepository, times(1)).findTerminatedUsersWithActiveAccounts();
+        verify(correlationDao, times(1)).findTerminatedUsersWithActiveAccounts();
     }
 
     @Test
     @DisplayName("getTerminatedUsersWithActiveAccounts: Should return empty list when compliant")
     void testGetTerminatedUsersWithActiveAccounts_Compliant() {
-        when(accountRepository.findTerminatedUsersWithActiveAccounts()).thenReturn(Collections.emptyList());
+        when(correlationDao.findTerminatedUsersWithActiveAccounts()).thenReturn(Collections.emptyList());
 
         List<TerminatedViolationResponse> result = correlationService.getTerminatedUsersWithActiveAccounts();
 
         assertThat(result).isEmpty();
-        verify(accountRepository, times(1)).findTerminatedUsersWithActiveAccounts();
+        verify(correlationDao, times(1)).findTerminatedUsersWithActiveAccounts();
     }
 }

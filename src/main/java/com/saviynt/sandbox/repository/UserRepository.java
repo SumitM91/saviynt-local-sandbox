@@ -1,142 +1,62 @@
 package com.saviynt.sandbox.repository;
 
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
+import com.saviynt.sandbox.entity.UserEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Spring Data JPA Repository for Identity Repository entities (users).
+ */
 @Repository
-public class UserRepository {
+public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
-    private final JdbcTemplate jdbcTemplate;
+    boolean existsByUsername(String username);
 
-    public UserRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    Optional<UserEntity> findByUsername(String username);
+
+    default Optional<UserEntity> findFirstUser() {
+        return findAll().stream().findFirst();
     }
 
-    public record UserEntity(
-            long userkey,
-            String username,
-            String firstname,
-            String lastname,
-            String email,
-            String departmentname,
-            String employeetype,
-            String manager,
-            Long orgkey,
-            int statuskey,
-            String customproperty1
-    ) {}
+    @Query(value = """
+        SELECT u.* FROM users u
+        INNER JOIN user_accounts ua ON u.userkey = ua.userkey
+        WHERE u.statuskey = 1
+        LIMIT 1
+        """, nativeQuery = true)
+    Optional<UserEntity> findFirstActiveUserWithLinkedAccounts();
 
-    private final RowMapper<UserEntity> userRowMapper = (rs, rowNum) -> new UserEntity(
-            rs.getLong("userkey"),
-            rs.getString("username"),
-            rs.getString("firstname"),
-            rs.getString("lastname"),
-            rs.getString("email"),
-            rs.getString("departmentname"),
-            rs.getString("employeetype"),
-            rs.getString("manager"),
-            rs.getObject("orgkey") != null ? rs.getLong("orgkey") : null,
-            rs.getInt("statuskey"),
-            rs.getString("customproperty1")
-    );
-
-    public boolean existsByUsername(String username) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users WHERE username = ?",
-                Integer.class,
-                username
-        );
-        return count != null && count > 0;
-    }
-
-    public Optional<UserEntity> findByUsername(String username) {
-        try {
-            UserEntity user = jdbcTemplate.queryForObject(
-                    "SELECT userkey, username, firstname, lastname, email, departmentname, employeetype, manager, orgkey, statuskey, customproperty1 FROM users WHERE username = ?",
-                    userRowMapper,
-                    username
-            );
-            return Optional.ofNullable(user);
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
-    }
-
-    public Optional<UserEntity> findFirstUser() {
-        List<UserEntity> list = jdbcTemplate.query(
-                "SELECT userkey, username, firstname, lastname, email, departmentname, employeetype, manager, orgkey, statuskey, customproperty1 FROM users LIMIT 1",
-                userRowMapper
-        );
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.getFirst());
-    }
-
-    public Optional<UserEntity> findFirstActiveUserWithLinkedAccounts() {
-        String sql = """
-            SELECT u.userkey, u.username, u.firstname, u.lastname, u.email, u.departmentname, u.employeetype, u.manager, u.orgkey, u.statuskey, u.customproperty1
-            FROM users u
-            INNER JOIN user_accounts ua ON u.userkey = ua.userkey
-            WHERE u.statuskey = 1
-            LIMIT 1
-            """;
-        List<UserEntity> list = jdbcTemplate.query(sql, userRowMapper);
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.getFirst());
-    }
-
-    public long createUser(String username, String firstname, String lastname, String email,
+    default long createUser(String username, String firstname, String lastname, String email,
                            String departmentname, String employeetype, String manager,
                            Long orgkey, int statuskey, String employeeId) {
-        String sql = """
-            INSERT INTO users (username, firstname, lastname, email, departmentname, employeetype, manager, orgkey, statuskey, startdate, customproperty1)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_DATE(), ?)
-            """;
-
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, username);
-            ps.setString(2, firstname);
-            ps.setString(3, lastname);
-            ps.setString(4, email);
-            ps.setString(5, departmentname);
-            ps.setString(6, employeetype);
-            ps.setString(7, manager);
-            ps.setObject(8, orgkey);
-            ps.setInt(9, statuskey);
-            ps.setString(10, employeeId);
-            return ps;
-        }, keyHolder);
-
-        return Objects.requireNonNull(keyHolder.getKey()).longValue();
+        UserEntity user = new UserEntity();
+        user.setUsername(username);
+        user.setFirstname(firstname);
+        user.setLastname(lastname);
+        user.setEmail(email);
+        user.setDepartmentname(departmentname);
+        user.setEmployeetype(employeetype);
+        user.setManager(manager);
+        user.setOrgkey(orgkey);
+        user.setStatuskey(statuskey);
+        user.setCustomproperty1(employeeId);
+        return save(user).getUserkey();
     }
 
-    public int updateDepartmentAndManager(long userKey, String departmentname, String manager) {
-        if (manager != null) {
-            return jdbcTemplate.update(
-                    "UPDATE users SET departmentname = ?, manager = ? WHERE userkey = ?",
-                    departmentname, manager, userKey
-            );
-        } else {
-            return jdbcTemplate.update(
-                    "UPDATE users SET departmentname = ? WHERE userkey = ?",
-                    departmentname, userKey
-            );
-        }
+    @Modifying
+    @Query("UPDATE UserEntity u SET u.departmentname = :dept, u.manager = :mgr WHERE u.userkey = :userKey")
+    int updateDepartmentAndManager(@Param("userKey") long userKey, @Param("dept") String dept, @Param("mgr") String mgr);
+
+    default int updateDepartmentAndManager(long userKey, String departmentname) {
+        return updateDepartmentAndManager(userKey, departmentname, null);
     }
 
-    public int terminateUser(long userKey) {
-        return jdbcTemplate.update(
-                "UPDATE users SET statuskey = 0, termdate = CURRENT_DATE() WHERE userkey = ?",
-                userKey
-        );
-    }
+    @Modifying
+    @Query("UPDATE UserEntity u SET u.statuskey = 0, u.termdate = CURRENT_DATE WHERE u.userkey = :userKey")
+    int terminateUser(@Param("userKey") long userKey);
 }

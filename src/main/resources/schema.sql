@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS user_accounts (
     );
 
 -- ==========================================
--- MODULE 4: JML LIFECYCLE & ARS TASKS ENGINE
+-- MODULE 4, 5 & 6: ARS TASKS & WORKFLOW ENGINE
 -- ==========================================
 CREATE TABLE IF NOT EXISTS arstasks (
     taskkey BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -89,9 +89,11 @@ CREATE TABLE IF NOT EXISTS arstasks (
     userkey BIGINT,
     accountkey BIGINT,
     endpointkey BIGINT,
-    status INT DEFAULT 0,                 -- Saviynt Standard: 0 = Pending/Assigned, 1 = Completed, 2 = Failed
+    status INT DEFAULT 0,                 -- Saviynt Standard: 0 = Pending/Assigned, 1 = Completed/Provisioning Ready, -1 = Rejected, 2 = Failed
     comments TEXT,
     createdate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    workflow_stage VARCHAR(50) DEFAULT 'MANAGER_PENDING',
+    approver_comments TEXT,
     FOREIGN KEY (userkey) REFERENCES users(userkey),
     FOREIGN KEY (accountkey) REFERENCES accounts(accountkey),
     FOREIGN KEY (endpointkey) REFERENCES endpoints(endpointkey)

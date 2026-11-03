@@ -6,6 +6,7 @@ import com.saviynt.sandbox.dto.LeaverRequest;
 import com.saviynt.sandbox.dto.LeaverResponse;
 import com.saviynt.sandbox.dto.MoverRequest;
 import com.saviynt.sandbox.dto.MoverResponse;
+import com.saviynt.sandbox.entity.UserEntity;
 import com.saviynt.sandbox.exception.ResourceNotFoundException;
 import com.saviynt.sandbox.repository.AccountRepository;
 import com.saviynt.sandbox.repository.AccountRepository.LinkedAccountEntity;
@@ -13,7 +14,6 @@ import com.saviynt.sandbox.repository.ArsTaskRepository;
 import com.saviynt.sandbox.repository.EndpointRepository;
 import com.saviynt.sandbox.repository.EndpointRepository.EndpointEntity;
 import com.saviynt.sandbox.repository.UserRepository;
-import com.saviynt.sandbox.repository.UserRepository.UserEntity;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,8 +65,8 @@ class Module4JmlServiceTest {
         when(userRepository.createUser(anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString(), anyLong(), anyInt(), anyString()))
                 .thenReturn(201L);
-        when(endpointRepository.findFirstEndpoint())
-                .thenReturn(Optional.of(new EndpointEntity(10L, "AWS_Production")));
+        when(endpointRepository.findFirstEndpoint()
+        ).thenReturn(Optional.of(new EndpointEntity(10L, "AWS_Production")));
         when(arsTaskRepository.createTask(eq(3), anyString(), eq(201L), isNull(), eq(10L), eq(0), anyString()))
                 .thenReturn(1001L);
         when(arsTaskRepository.createTask(eq(1), anyString(), eq(201L), isNull(), eq(10L), eq(0), anyString()))

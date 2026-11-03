@@ -61,6 +61,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("handleIllegalState: Should return 400 ProblemDetail for IllegalStateException")
+    void testHandleIllegalState() {
+        IllegalStateException ex = new IllegalStateException("Illegal state transition attempted");
+        ProblemDetail problem = handler.handleIllegalState(ex);
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getTitle()).isEqualTo("Illegal State Transition");
+        assertThat(problem.getDetail()).isEqualTo("Illegal state transition attempted");
+        assertThat(problem.getProperties()).containsKey("timestamp");
+    }
+
+    @Test
     @DisplayName("handleGenericException: Should return 500 ProblemDetail for generic Exception")
     void testHandleGenericException() {
         RuntimeException ex = new RuntimeException("Unexpected runtime glitch");
