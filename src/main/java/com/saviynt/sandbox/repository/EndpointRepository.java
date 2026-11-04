@@ -1,33 +1,30 @@
 package com.saviynt.sandbox.repository;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.saviynt.sandbox.entity.EndpointEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Spring Data JPA Repository for Application Endpoint entities (endpoints).
+ */
 @Repository
-public class EndpointRepository {
+public interface EndpointRepository extends JpaRepository<EndpointEntity, Long> {
 
-    private final JdbcTemplate jdbcTemplate;
-
-    public EndpointRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    public record EndpointEntity(
+    // Preserved nested record for backward-compatibility with Module4JmlService & Module4JmlServiceTest
+    record EndpointEntity(
             long endpointkey,
             String endpointname
     ) {}
 
-    public Optional<EndpointEntity> findFirstEndpoint() {
-        List<EndpointEntity> list = jdbcTemplate.query(
-                "SELECT endpointkey, endpointname FROM endpoints ORDER BY endpointkey LIMIT 1",
-                (rs, rowNum) -> new EndpointEntity(
-                        rs.getLong("endpointkey"),
-                        rs.getString("endpointname")
-                )
-        );
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.getFirst());
+    default Optional<EndpointEntity> findFirstEndpoint() {
+        return findAll().stream().findFirst()
+                .map(e -> new EndpointEntity(e.getEndpointkey(), e.getEndpointname()));
     }
+
+    Optional<com.saviynt.sandbox.entity.EndpointEntity> findByEndpointname(String endpointname);
+
+    List<com.saviynt.sandbox.entity.EndpointEntity> findBySystemkey(Long systemkey);
 }

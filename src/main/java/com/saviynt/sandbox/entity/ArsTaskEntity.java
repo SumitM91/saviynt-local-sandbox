@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 /**
  * JPA Entity for Saviynt ARS Provisioning and Workflow Tasks (arstasks).
- * Maps existing schema with zero DDL generation.
+ * Maps existing schema with zero DDL generation and supports WSRETRY engine attributes.
  */
 @Entity
 @Table(name = "arstasks")
@@ -51,6 +51,16 @@ public class ArsTaskEntity {
 
     @Column(name = "createdate", insertable = false, updatable = false)
     private LocalDateTime createdate;
+
+    // WSRETRY & Task Split Hierarchy Attributes (managed in entity to avoid DDL/schema breakage)
+    @Transient
+    private Integer retryCount = 0;
+
+    @Transient
+    private Long parentTaskId;
+
+    @Transient
+    private String targetResponse;
 
     public ArsTaskEntity() {
     }
@@ -199,5 +209,45 @@ public class ArsTaskEntity {
 
     public void setCreatedate(LocalDateTime createdate) {
         this.createdate = createdate;
+    }
+
+    public int getRetryCount() {
+        if (retryCount == null || retryCount == 0) {
+            if (provisioningcomments != null && provisioningcomments.contains("[RETRY_COUNT:")) {
+                try {
+                    int start = provisioningcomments.indexOf("[RETRY_COUNT:") + 13;
+                    int end = provisioningcomments.indexOf("]", start);
+                    if (end > start) {
+                        return Integer.parseInt(provisioningcomments.substring(start, end).trim());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return retryCount != null ? retryCount : 0;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public void setRetryCount(Integer retryCount) {
+        this.retryCount = retryCount != null ? retryCount : 0;
+    }
+
+    public Long getParentTaskId() {
+        return parentTaskId;
+    }
+
+    public void setParentTaskId(Long parentTaskId) {
+        this.parentTaskId = parentTaskId;
+    }
+
+    public String getTargetResponse() {
+        return targetResponse != null ? targetResponse : provisioningcomments;
+    }
+
+    public void setTargetResponse(String targetResponse) {
+        this.targetResponse = targetResponse;
     }
 }

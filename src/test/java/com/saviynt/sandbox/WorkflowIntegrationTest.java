@@ -6,6 +6,7 @@ import com.saviynt.sandbox.dto.WorkflowSubmitRequest;
 import com.saviynt.sandbox.entity.ArsTaskEntity;
 import com.saviynt.sandbox.repository.ArsTaskRepository;
 import com.saviynt.sandbox.repository.CorrelationDao;
+import com.saviynt.sandbox.service.Module1And2Service;
 import com.saviynt.sandbox.service.WorkflowService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class WorkflowIntegrationTest {
 
     @Autowired
     private CorrelationDao correlationDao;
+
+    @Autowired
+    private Module1And2Service module1And2Service;
 
     @Test
     @DisplayName("End-to-end integration: Submit -> Manager Approve -> App Owner Approve")
@@ -117,5 +121,16 @@ class WorkflowIntegrationTest {
         // Verify CorrelationDao bulk JdbcTemplate execution in same transaction
         var orphans = correlationDao.findOrphanAccounts();
         assertThat(orphans).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Module 1 & 2: Integration test querying existing endpoints and 3-tier mapping")
+    void testModule1And2LiveHierarchy() {
+        var endpoints = module1And2Service.getAllEndpoints();
+        assertThat(endpoints).isNotEmpty();
+        var aws = module1And2Service.getEndpointByName("AWS_Production");
+        assertThat(aws.systemName()).isEqualTo("AWS_SecSystem");
+        assertThat(aws.connectionName()).isEqualTo("AWS_REST_Conn");
+        assertThat(aws.connectionType()).isEqualTo("REST");
     }
 }
