@@ -4,11 +4,15 @@ import com.saviynt.sandbox.dto.FailedTaskResponse;
 import com.saviynt.sandbox.dto.TaskProvisioningSummary;
 import com.saviynt.sandbox.dto.TaskRetryResponse;
 import com.saviynt.sandbox.dto.WsRetryJobResult;
+import com.saviynt.sandbox.exception.GlobalExceptionHandler;
+import com.saviynt.sandbox.exception.ResourceNotFoundException;
 import com.saviynt.sandbox.service.Module7And8ProvisioningService;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(Module7And8JobController.class)
+@Import(GlobalExceptionHandler.class)
 class Module7And8JobControllerTest {
 
     @Autowired
@@ -73,6 +78,21 @@ class Module7And8JobControllerTest {
                 .andExpect(jsonPath("$.outcome").value("SUCCESS"));
 
         verify(provisioningService).manualRetryTask(31L);
+    }
+
+    @Test
+    @DisplayName("POST /saviynt/module7-8/tasks/{taskKey}/retry returns 404 when task not found")
+    void testManualRetryTask_NotFound() throws Exception {
+        when(provisioningService.manualRetryTask(9999L))
+                .thenThrow(new ResourceNotFoundException("ArsTask not found with taskKey=9999"));
+
+        mockMvc.perform(post("/saviynt/module7-8/tasks/9999/retry")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Resource Not Found"))
+                .andExpect(jsonPath("$.detail", Matchers.containsString("9999")));
+
+        verify(provisioningService).manualRetryTask(9999L);
     }
 
     @Test
